@@ -149,11 +149,10 @@ export const PhotoRecognitionPage: React.FC<PhotoRecognitionPageProps> = ({
     setLinkSuccess(null);
 
     const formData = new FormData();
-    formData.append('images', file, file.name || 'plant.jpg');
-    formData.append('image', file, file.name || 'plant.jpg');
-    formData.append('organ', activeOrgan);
-    formData.append('organs', activeOrgan);
-    formData.append('project', 'all');
+    formData.append('images', file, file.name || 'specimen.jpg');
+    if (activeOrgan && activeOrgan !== 'auto') {
+      formData.append('organs', activeOrgan);
+    }
 
     // Retrieve active Supabase session token or authenticated user token
     let token = '';

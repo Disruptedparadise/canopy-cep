@@ -194,7 +194,7 @@ app.get('/api/health', (_req: Request, res: Response) => {
 });
 
 // Pl@ntNet Identification Proxy Endpoint (Rate Limiting by IP)
-app.post('/api/identify-plant', upload.single('image'), async (req: Request, res: Response) => {
+app.post('/api/identify-plant', upload.any(), async (req: Request, res: Response) => {
   try {
     // Step B: Rate limiting per IP address
     const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown-ip';
@@ -223,8 +223,9 @@ app.post('/api/identify-plant', upload.single('image'), async (req: Request, res
       });
     }
 
-    // Step D: Validate uploaded photo
-    if (!req.file) {
+    // Step D: Validate uploaded photo (accept 'images' or 'image')
+    const uploadedFile = req.file || ((req.files as Express.Multer.File[])?.[0]);
+    if (!uploadedFile) {
       return res.status(400).json({
         error: 'No Image Uploaded',
         code: 'NO_IMAGE',
@@ -232,13 +233,13 @@ app.post('/api/identify-plant', upload.single('image'), async (req: Request, res
       });
     }
 
-    const organ = (req.body?.organ as string) || 'auto';
+    const organ = (req.body?.organ as string) || (req.body?.organs as string) || 'auto';
     const project = (req.body?.project as string) || 'all';
 
     // Step E: Dispatch multipart request to Pl@ntNet
     const formData = new FormData();
-    const fileBlob = new Blob([req.file.buffer], { type: req.file.mimetype });
-    formData.append('images', fileBlob, req.file.originalname || 'plant.jpg');
+    const fileBlob = new Blob([uploadedFile.buffer], { type: uploadedFile.mimetype });
+    formData.append('images', fileBlob, uploadedFile.originalname || 'plant.jpg');
 
     if (organ && organ !== 'auto') {
       formData.append('organs', organ);
