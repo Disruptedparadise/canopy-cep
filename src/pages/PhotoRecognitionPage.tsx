@@ -177,24 +177,96 @@ export const PhotoRecognitionPage: React.FC<PhotoRecognitionPageProps> = ({
     }
 
     try {
-      const response = await fetch('/api/identify-plant', {
-        method: 'POST',
-        headers,
-        body: formData,
-      });
+      let data: any = null;
+      let needDirectFallback = false;
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setApiError({
-          message: data.message || data.error || 'Failed to communicate with the Pl@ntNet identification API.',
-          code: data.code || (response.status === 401 ? 'AUTH_REQUIRED' : response.status === 429 ? 'RATE_LIMIT_EXCEEDED' : 'API_ERROR'),
+      // Attempt 1: Server proxy endpoint (works in local dev / Node environments)
+      try {
+        const response = await fetch('/api/identify-plant', {
+          method: 'POST',
+          headers,
+          body: formData,
         });
-        setIsAnalyzing(false);
-        return;
+
+        const contentType = response.headers.get('content-type') || '';
+        if (response.ok && contentType.includes('application/json')) {
+          data = await response.json();
+        } else {
+          // Non-JSON or static host (e.g. Vercel SPA) -> use direct fallback
+          needDirectFallback = true;
+        }
+      } catch {
+        needDirectFallback = true;
       }
 
-      if (!data.results || data.results.length === 0) {
+      // Attempt 2: Direct Pl@ntNet API call (enables 100% functionality on static cloud hosts like Vercel)
+      if (needDirectFallback) {
+        const clientApiKey =
+          (import.meta.env.VITE_PLANTNET_API_KEY as string) ||
+          '2b105Qkannd1n6IwRrBVPSkfSu';
+
+        const directFormData = new FormData();
+        directFormData.append('images', file, file.name || 'specimen.jpg');
+        if (activeOrgan && activeOrgan !== 'auto') {
+          directFormData.append('organs', activeOrgan);
+        }
+
+        const directUrl = `https://my-api.plantnet.org/v2/identify/all?api-key=${encodeURIComponent(clientApiKey.trim())}`;
+        const directRes = await fetch(directUrl, {
+          method: 'POST',
+          body: directFormData,
+        });
+
+        if (!directRes.ok) {
+          if (directRes.status === 404) {
+            setApiError({
+              message: 'No botanical species matches found in the Pl@ntNet global flora database for this image.',
+              code: 'NO_MATCHES',
+            });
+            setIsAnalyzing(false);
+            return;
+          }
+          const errText = await directRes.text();
+          let errMessage = `Pl@ntNet responded with status ${directRes.status}`;
+          try {
+            const parsed = JSON.parse(errText);
+            if (parsed.message) errMessage = parsed.message;
+          } catch {}
+
+          setApiError({
+            message: errMessage,
+            code: directRes.status === 401 || directRes.status === 403 ? 'INVALID_API_KEY' : 'API_ERROR',
+          });
+          setIsAnalyzing(false);
+          return;
+        }
+
+        const directJson = await directRes.json();
+        const mappedResults = (directJson.results || []).slice(0, 5).map((item: any) => {
+          const score = typeof item.score === 'number' ? item.score : 0;
+          const percentage = Math.round(score * 100);
+          const species = item.species || {};
+          const commonNames: string[] = species.commonNames || [];
+          const scientificName = species.scientificNameWithoutAuthor || species.scientificName || 'Unknown Specimen';
+
+          return {
+            score,
+            percentage,
+            scientificName,
+            scientificNameWithAuthor: species.scientificName,
+            family: species.family?.scientificNameWithoutAuthor || '',
+            genus: species.genus?.scientificNameWithoutAuthor || '',
+            commonNames,
+          };
+        });
+
+        data = {
+          bestMatch: directJson.bestMatch || (mappedResults[0]?.scientificName ?? null),
+          results: mappedResults,
+        };
+      }
+
+      if (!data || !data.results || data.results.length === 0) {
         setApiError({
           message: 'No botanical species matches found in the Pl@ntNet global flora database for this image.',
           code: 'NO_MATCHES',
