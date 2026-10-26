@@ -20,7 +20,7 @@ export const Footer: React.FC = () => {
     { label: 'Species & Soil Matcher', to: '/identify' },
     { label: 'Soil Health & Swales', to: '/soil-tips' },
     { label: 'Interactive Tree Tracker', to: '/tree-tracker' },
-    { label: 'Survival Outcomes Ledger', to: '/dashboard' },
+    { label: 'Reforestation Campaigns', to: '/campaigns' },
   ];
 
   const platformTools = [
