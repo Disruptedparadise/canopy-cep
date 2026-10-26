@@ -1,0 +1,6 @@
+{
+  "name": "RootGuard",
+  "description": "OnEarth nature conservation and reforestation platform powered by RootGuard: tree survival tracking, slope erosion mitigation, and community ecological stewardship.",
+  "requestFramePermissions": ["camera", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
